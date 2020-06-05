@@ -1,3 +1,5 @@
+# IUS spec file for php74-pecl-redis, forked from:
+#
 # Fedora spec file for php-pecl-redis5
 # without SCL compatibility from:
 #
@@ -22,11 +24,13 @@
 %endif
 # after 20-json, 40-igbinary and 40-msgpack
 %global ini_name    50-%{pecl_name}.ini
+%global php         php74
+
 %global upstream_version 5.2.2
 #global upstream_prever  RC2
 
 Summary:       Extension for communicating with the Redis key-value store
-Name:          php-pecl-redis5
+Name:          %{php}-pecl-%{pecl_name}
 Version:       %{upstream_version}%{?upstream_prever:~%{upstream_prever}}
 Release:       1%{?dist}
 Source0:       https://pecl.php.net/get/%{pecl_name}-%{upstream_version}%{?upstream_prever}.tgz
@@ -34,11 +38,12 @@ License:       PHP
 URL:           https://pecl.php.net/package/redis
 
 BuildRequires: gcc
-BuildRequires: php-devel > 7
-BuildRequires: php-pear
-BuildRequires: php-json
-BuildRequires: php-pecl-igbinary-devel
-BuildRequires: php-pecl-msgpack-devel >= 2.0.3
+BuildRequires: %{php}-devel > 7
+BuildRequires: %{php}-json
+# build require pear1's dependencies to avoid mismatched php stacks
+BuildRequires: pear1 %{php}-cli %{php}-common %{php}-xml
+BuildRequires: %{php}-pecl-igbinary-devel
+BuildRequires: %{php}-pecl-msgpack-devel >= 2.0.3
 BuildRequires: liblzf-devel
 BuildRequires: libzstd-devel >= 1.3.0
 # to run Test suite
@@ -48,9 +53,9 @@ BuildRequires: redis >= 3
 
 Requires:      php(zend-abi) = %{php_zend_api}
 Requires:      php(api) = %{php_core_api}
-Requires:      php-json%{?_isa}
-Requires:      php-pecl(igbinary)%{?_isa}
-Requires:      php-pecl-msgpack%{?_isa}
+Requires:      %{php}-json
+Requires:      %{php}-pecl-igbinary%{?_isa}
+Requires:      %{php}-pecl-msgpack%{?_isa}
 
 Obsoletes:     php-%{pecl_name}               < 3
 Provides:      php-%{pecl_name}               = %{version}
@@ -70,6 +75,11 @@ Provides:      php-pecl-%{pecl_name}4%{?_isa} = %{version}-%{release}
 Conflicts:     php-pecl-%{pecl_name}  < 5
 Conflicts:     php-pecl-%{pecl_name}4 < 5
 %endif
+
+# safe replacement
+Provides:      php-pecl-%{pecl_name} = %{version}-%{release}
+Provides:      php-pecl-%{pecl_name}%{?_isa} = %{version}-%{release}
+Conflicts:     php-pecl-%{pecl_name} < %{version}-%{release}
 
 
 %description
@@ -171,7 +181,7 @@ cd NTS
     --enable-redis-zstd \
     --with-libzstd \
     --with-php-config=%{_bindir}/php-config
-make %{?_smp_mflags}
+%make_build
 
 %if %{with_zts}
 cd ../ZTS
@@ -186,7 +196,7 @@ cd ../ZTS
     --enable-redis-zstd \
     --with-libzstd \
     --with-php-config=%{_bindir}/zts-php-config
-make %{?_smp_mflags}
+%make_build
 %endif
 
 
@@ -204,7 +214,7 @@ install -D -m 644 %{ini_name} %{buildroot}%{php_ztsinidir}/%{ini_name}
 %endif
 
 # Install the package XML file
-install -D -m 644 package.xml %{buildroot}%{pecl_xmldir}/%{name}.xml
+install -D -m 644 package.xml %{buildroot}%{pecl_xmldir}/%{pecl_name}.xml
 
 # Documentation
 cd NTS
@@ -266,10 +276,28 @@ exit $ret
 %endif
 
 
+%triggerin -- pear1
+if [ -x %{__pecl} ]; then
+    %{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
+fi
+
+
+%posttrans
+if [ -x %{__pecl} ]; then
+    %{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
+fi
+
+
+%postun
+if [ $1 -eq 0 -a -x %{__pecl} ]; then
+    %{pecl_uninstall} %{pecl_name} >/dev/null || :
+fi
+
+
 %files
 %license NTS/COPYING
 %doc %{pecl_docdir}/%{pecl_name}
-%{pecl_xmldir}/%{name}.xml
+%{pecl_xmldir}/%{pecl_name}.xml
 
 %{php_extdir}/%{pecl_name}.so
 %config(noreplace) %{php_inidir}/%{ini_name}
@@ -281,6 +309,9 @@ exit $ret
 
 
 %changelog
+* Thu Jun 04 2020 David Alger <davidmalger@gmail.com> - 5.2.2-1
+- Port from Fedora to IUS
+
 * Wed May  6 2020 Remi Collet <remi@remirepo.net> - 5.2.2-1
 - update to 5.2.2
 - refresh options in provided configuration file
